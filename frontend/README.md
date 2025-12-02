@@ -1,3 +1,32 @@
+# frontend
+
+This folder contains the frontend application (Vite + React).
+
+Quick start
+
+1. Change to the `frontend` directory:
+
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Start the dev server:
+
+```bash
+npm run dev
+```
+
+Notes
+
+- This project expects a backend API at `VITE_API_URL` or `http://localhost:8000/api` by default.
+- After editing `package.json` dependencies, run `npm install` to fetch new packages (`react-router-dom`, `axios`).
+ - After editing `package.json` dependencies, run `npm install` to fetch new packages (`react-router-dom`, `axios`).
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

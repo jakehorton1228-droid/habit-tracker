@@ -1,0 +1,22 @@
+.site-nav {
+  background: #0f172a;
+  color: white;
+  padding: 0.5rem 1rem;
+}
+
+.site-nav ul {
+  display: flex;
+  gap: 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.site-nav a {
+  color: #c7d2fe;
+  text-decoration: none;
+}
+
+.site-nav a:hover {
+  text-decoration: underline;
+}
