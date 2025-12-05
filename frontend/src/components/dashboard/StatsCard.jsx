@@ -1,15 +1,19 @@
-import { motion } from 'framer-motion'
-
 export default function StatsCard({ title, value }) {
   return (
-    <motion.div
-      className="stats-card"
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: 'easeOut' }}
+    <div
+      className="p-5 rounded-lg border border-white/5 backdrop-blur-lg transition-all duration-200 hover:-translate-y-0.5"
+      style={{
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
+        boxShadow: 'var(--soft-shadow), var(--card-glow)',
+      }}
     >
-      <div className="stats-title">{title}</div>
-      <div className="stats-value">{value}</div>
-    </motion.div>
+      <div className="text-muted text-sm uppercase tracking-wider">{title}</div>
+      <div
+        className="text-3xl mt-2 font-bold bg-clip-text text-transparent"
+        style={{ backgroundImage: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-3) 100%)' }}
+      >
+        {value}
+      </div>
+    </div>
   )
 }

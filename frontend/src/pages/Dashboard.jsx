@@ -3,38 +3,29 @@ import StatsCard from '../components/dashboard/StatsCard'
 import HabitList from '../components/dashboard/HabitList'
 import GoalList from '../components/dashboard/GoalList'
 import ActivityFeed from '../components/dashboard/ActivityFeed'
-import '../components/dashboard/dashboard.css'
 import FullCalendarView from '../components/Calendar/FullCalendarView'
 
 export default function Dashboard() {
   return (
-    <div className="dashboard">
-      <section>
-        <h2>Dashboard</h2>
-        <div className="dashboard-grid">
+    <div className="grid grid-cols-[1fr_320px] grid-rows-[auto_1fr] gap-6 p-6 min-h-[calc(100vh-60px)] max-md:grid-cols-1">
+      <section className="col-span-2 max-md:col-span-1">
+        <FullCalendarView />
+      </section>
+
+      <section className="flex flex-col gap-5">
+        <div className="grid grid-cols-3 gap-4 max-md:grid-cols-1">
           <StatsCard title="Total Habits" value={mockStats.totalHabits} />
           <StatsCard title="Completed Today" value={mockStats.completedToday} />
           <StatsCard title="Best Streak" value={mockStats.streakBest} />
-          <div className="stats-card">
-            <h3>Quick Actions</h3>
-            <p>Coming soon: add habit, mark complete, bulk edit.</p>
-          </div>
         </div>
 
-        <div style={{ marginTop: '1rem' }}>
+        <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
           <HabitList items={mockHabits} />
+          <GoalList items={mockGoals} />
         </div>
-
-        <div style={{ marginTop: '1rem' }}>
-          <h3>Calendar</h3>
-          <FullCalendarView />
-        </div>
-
       </section>
 
       <aside>
-        <GoalList items={mockGoals} />
-        <div style={{ height: '1rem' }} />
         <ActivityFeed items={mockActivity} />
       </aside>
     </div>

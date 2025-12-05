@@ -1,64 +1,331 @@
+@import "tailwindcss";
 @import './styles/variables.css';
+
+/* Tailwind v4 theme configuration */
+@theme {
+  /* Colors mapped from CSS variables */
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-3: var(--accent-3);
+  --color-glass: var(--glass);
+
+  /* Semantic colors */
+  --color-success: #22c55e;
+  --color-warning: #fbbf24;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Spacing */
+  --spacing-space: var(--space);
+
+  /* Border radius */
+  --radius-lg: var(--radius);
+  --radius-md: 10px;
+  --radius-sm: 6px;
+
+  /* Shadows */
+  --shadow-soft: var(--soft-shadow);
+  --shadow-glow: var(--card-glow);
+}
 
 :root {
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: light dark;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
-a {
-  font-weight: 600;
-  color: var(--accent);
-  text-decoration: none;
-}
-a:hover {
-  opacity: 0.9;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 999px;
-  border: 1px solid transparent;
-  padding: 0.6em 1rem;
-  font-size: 1rem;
-  font-weight: 600;
-  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-  color: #eaf0ff;
-  cursor: pointer;
-  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
-}
-button:hover {
-  transform: translateY(-2px) scale(1.01);
-  box-shadow: var(--soft-shadow);
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* Base styles */
+@layer base {
+  a {
+    @apply font-semibold text-accent no-underline transition-colors duration-200;
   }
   a:hover {
-    color: #747bff;
+    @apply text-accent-2;
   }
-  button {
-    background-color: #f9f9f9;
+
+  body {
+    @apply m-0 min-w-80 min-h-screen;
+  }
+
+  h1 {
+    @apply text-5xl leading-tight;
+  }
+
+  h3 {
+    @apply m-0 mb-2 text-base text-accent-2;
   }
 }
 
- 
+/* Button component */
+@layer components {
+  .btn {
+    @apply rounded-md border border-glass px-5 py-2.5 text-sm font-semibold text-text cursor-pointer transition-all duration-200;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent-2) 20%, transparent));
+  }
+
+  .btn:hover {
+    @apply -translate-y-0.5 border-transparent text-white;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+
+  .btn:focus,
+  .btn:focus-visible {
+    @apply outline-2 outline-accent-2 outline-offset-2;
+  }
+
+  .btn:active {
+    @apply translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent border-white/10 text-muted;
+  }
+
+  .btn-ghost:hover {
+    @apply bg-white/5 text-text;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-danger {
+    @apply text-error;
+  }
+
+  .btn-danger:hover {
+    @apply bg-error/20;
+  }
+
+  /* Card component */
+  .card {
+    @apply p-4 rounded-lg border border-white/5;
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+    box-shadow: var(--soft-shadow);
+  }
+
+  .card-glow {
+    box-shadow: var(--soft-shadow), var(--card-glow);
+  }
+
+  /* Input component */
+  .input {
+    @apply px-3 py-2.5 rounded-md border border-white/10 bg-white/5 text-text text-sm;
+  }
+
+  .input:focus {
+    @apply outline-none border-accent-2;
+  }
+
+  .input::placeholder {
+    @apply text-muted;
+  }
+
+  /* Select component */
+  .select {
+    @apply px-3 py-2.5 rounded-md border border-white/10 text-text text-sm cursor-pointer;
+    background: rgba(15,10,24,0.95);
+  }
+
+  .select:focus {
+    @apply outline-none border-accent-2;
+  }
+
+  .select option {
+    background: #1a1025;
+    color: var(--text);
+  }
+}
+
+/* Legacy button styles for non-migrated components */
+button {
+  border-radius: 10px;
+  border: 1px solid var(--glass);
+  padding: 0.6em 1.2rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent-2) 20%, transparent));
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 25%, transparent);
+  border-color: transparent;
+  color: #fff;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+/* Selection color */
+::selection {
+  @apply bg-accent-2/40 text-white;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-white/[0.02];
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-accent-2/30 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-accent-2/50;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* FullCalendar overrides */
+.fc .fc-toolbar {
+  @apply mb-4;
+}
+
+.fc .fc-toolbar-title {
+  @apply font-[Poppins,Inter,sans-serif] text-xl bg-clip-text text-transparent;
+  background-image: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+}
+
+.fc .fc-button {
+  @apply font-medium transition-all duration-200;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--muted);
+}
+
+.fc .fc-button:hover {
+  background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 100%);
+  @apply text-white border-transparent;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  @apply border-transparent text-white;
+}
+
+.fc .fc-today-button {
+  @apply font-semibold;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 25%, transparent), color-mix(in srgb, var(--accent-2) 25%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+}
+
+.fc .fc-today-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  @apply text-white border-transparent;
+}
+
+.fc .fc-today-button:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+
+.fc .fc-col-header,
+.fc .fc-col-header-cell,
+.fc-theme-standard th,
+.fc th {
+  background: rgba(168,85,247,0.1) !important;
+  border-color: rgba(255,255,255,0.04) !important;
+}
+
+.fc .fc-col-header-cell {
+  @apply py-2.5;
+}
+
+.fc .fc-col-header-cell-cushion {
+  @apply text-accent-2 font-semibold uppercase text-xs tracking-wider no-underline;
+}
+
+.fc-theme-standard .fc-scrollgrid {
+  border-color: rgba(255,255,255,0.05);
+}
+
+.fc .fc-daygrid-day {
+  @apply transition-colors duration-150;
+}
+
+.fc .fc-daygrid-day:hover {
+  background: rgba(168,85,247,0.08);
+}
+
+.fc .fc-daygrid-day-number {
+  @apply text-muted p-2;
+}
+
+.fc .fc-day-today {
+  background: color-mix(in srgb, var(--accent-2) 15%, transparent) !important;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  @apply text-accent-2 font-bold;
+}
+
+.fc .fc-daygrid-event {
+  @apply text-white border-none rounded-md px-1.5 py-0.5 text-xs font-medium;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: 0 2px 8px rgba(255,107,107,0.3);
+}
+
+.fc .fc-daygrid-event:hover {
+  @apply brightness-110;
+}
+
+.fc .fc-scrollgrid {
+  border-color: rgba(255,255,255,0.05);
+}
+
+.fc td, .fc th {
+  border-color: rgba(255,255,255,0.04);
+}
+
+.fc .fc-daygrid-more-link {
+  @apply text-accent-3 font-semibold;
+}
