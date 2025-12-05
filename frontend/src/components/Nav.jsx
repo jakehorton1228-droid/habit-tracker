@@ -1,6 +1,10 @@
 import { NavLink } from 'react-router-dom'
 import UserMenu from './UserMenu'
 
+/**
+ * Main navigation bar with links to Dashboard, Habits, Goals, and Journal.
+ * Includes UserMenu dropdown for account settings.
+ */
 export default function Nav() {
   const linkClass = ({ isActive }) =>
     `px-4 py-2 rounded-lg font-medium transition-all duration-200 ${

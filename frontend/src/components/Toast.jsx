@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react'
 
+/**
+ * Toast notification component with auto-dismiss and optional undo action.
+ * Displays success, info, warning, or error messages with a progress bar.
+ * @param {Object} props
+ * @param {string} props.message - Toast message text
+ * @param {'success'|'info'|'warning'|'error'} [props.type='info'] - Toast type
+ * @param {Function} [props.onUndo] - Optional undo callback (shows undo button if provided)
+ * @param {Function} props.onClose - Callback when toast is dismissed
+ * @param {number} [props.duration=5000] - Auto-dismiss duration in ms
+ */
+
 const iconColors = {
   success: 'bg-success/20 text-success',
   info: 'bg-info/20 text-info',

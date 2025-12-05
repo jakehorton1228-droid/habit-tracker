@@ -1,3 +1,9 @@
+/**
+ * Displays habit completion statistics with weekly bar chart and per-habit progress bars.
+ * Shows 8 weeks of completion rate history and 90-day performance by habit.
+ * @param {Object} props
+ * @param {Array} props.habits - Array of habit objects with history arrays
+ */
 export default function CompletionChart({ habits }) {
   const weeks = []
   const today = new Date()

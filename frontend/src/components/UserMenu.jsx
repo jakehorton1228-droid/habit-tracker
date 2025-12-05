@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSettings } from '../hooks/useSettings'
 
+/**
+ * User account dropdown menu with profile access and preference settings.
+ * Allows changing theme and week start day preferences.
+ */
 export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false)
   const { settings, updateSetting } = useSettings()

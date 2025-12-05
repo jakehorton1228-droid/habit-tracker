@@ -1,3 +1,8 @@
+/**
+ * Displays a list of recent user activities with timestamps.
+ * @param {Object} props
+ * @param {Array} props.items - Activity items with id, text, and time properties
+ */
 export default function ActivityFeed({ items = [] }) {
   return (
     <div

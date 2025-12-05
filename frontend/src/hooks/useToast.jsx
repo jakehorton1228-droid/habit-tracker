@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import Toast from '../components/Toast'
 
+/**
+ * Toast notification context and hook.
+ * Provides toast.success(), toast.error(), toast.warning(), and toast.info() methods.
+ * Toasts auto-dismiss and support optional undo actions.
+ */
+
 const ToastContext = createContext(null)
 
 export function ToastProvider({ children }) {

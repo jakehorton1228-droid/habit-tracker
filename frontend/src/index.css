@@ -301,11 +301,19 @@ button:active {
 }
 
 .fc .fc-day-today {
-  background: color-mix(in srgb, var(--accent-2) 15%, transparent) !important;
+  background: transparent !important;
 }
 
 .fc .fc-day-today .fc-daygrid-day-number {
-  @apply text-accent-2 font-bold;
+  @apply text-white font-bold;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px;
 }
 
 .fc .fc-daygrid-event {

@@ -7,6 +7,11 @@ import { calendarEvents as initialEvents } from '../../utils/mockData'
 import { useSettings } from '../../hooks/useSettings'
 import Modal from '../Modal'
 
+/**
+ * Full-featured calendar component using FullCalendar library.
+ * Supports month, week, and day views with event creation and completion.
+ * Respects user's week start preference from settings.
+ */
 export default function FullCalendarView() {
   const [events, setEvents] = useState(initialEvents)
   const { settings } = useSettings()

@@ -1,3 +1,10 @@
+/**
+ * GitHub-style activity heatmap showing 90 days of habit completion history.
+ * Displays completion rate and color-coded day cells.
+ * @param {Object} props
+ * @param {Array} props.history - Array of completion objects with date strings
+ * @param {string} [props.color='#a855f7'] - Accent color for completed days
+ */
 export default function Heatmap({ history, color = '#a855f7' }) {
   const days = []
   const today = new Date()

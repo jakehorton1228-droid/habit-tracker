@@ -1,3 +1,8 @@
+/**
+ * Displays a list of habits with streak counts and completion status.
+ * @param {Object} props
+ * @param {Array} props.items - Habit items with id, title, streak, and doneToday properties
+ */
 export default function HabitList({ items = [] }) {
   return (
     <div

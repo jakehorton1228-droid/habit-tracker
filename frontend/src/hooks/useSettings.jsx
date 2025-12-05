@@ -1,5 +1,14 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 
+/**
+ * Settings context and hook for managing user preferences.
+ * Persists settings to localStorage and applies theme to document.
+ *
+ * Available settings:
+ * - theme: 'sunset' | 'dark' | 'light'
+ * - weekStart: 'sunday' | 'monday'
+ */
+
 const STORAGE_KEY = 'habit-tracker-settings'
 
 const defaultSettings = {

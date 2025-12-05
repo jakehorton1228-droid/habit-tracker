@@ -1,3 +1,9 @@
+/**
+ * Dashboard stat card with gradient value display.
+ * @param {Object} props
+ * @param {string} props.title - Stat label
+ * @param {string|number} props.value - Stat value to display
+ */
 export default function StatsCard({ title, value }) {
   return (
     <div

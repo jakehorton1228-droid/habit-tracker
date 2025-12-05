@@ -1,5 +1,14 @@
 import { useEffect, useRef } from 'react'
 
+/**
+ * Reusable modal dialog component with backdrop and keyboard support.
+ * Closes on Escape key or backdrop click.
+ * @param {Object} props
+ * @param {boolean} props.isOpen - Whether the modal is visible
+ * @param {Function} props.onClose - Callback when modal should close
+ * @param {string} props.title - Modal header title
+ * @param {React.ReactNode} props.children - Modal body content
+ */
 export default function Modal({ isOpen, onClose, title, children }) {
   const modalRef = useRef(null)
 
