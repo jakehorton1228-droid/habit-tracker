@@ -27,9 +27,23 @@ Features:
 """
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from django_filters import rest_framework as filters
 
 from .models import JournalEntry
 from .serializers import JournalEntrySerializer
+
+
+class JournalEntryFilter(filters.FilterSet):
+    """Filter for journal entries by date, mood, and entry type."""
+    date = filters.DateFilter()
+    date_after = filters.DateFilter(field_name='date', lookup_expr='gte')
+    date_before = filters.DateFilter(field_name='date', lookup_expr='lte')
+    mood = filters.ChoiceFilter(choices=JournalEntry.MOOD_CHOICES)
+    entry_type = filters.ChoiceFilter(choices=JournalEntry.TYPE_CHOICES)
+
+    class Meta:
+        model = JournalEntry
+        fields = ['date', 'mood', 'entry_type']
 
 
 class JournalEntryViewSet(viewsets.ModelViewSet):
@@ -43,6 +57,9 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
     Attributes:
         serializer_class: JournalEntrySerializer for request/response handling.
         permission_classes: Requires JWT authentication.
+        filterset_class: JournalEntryFilter for filtering by date/mood/type.
+        search_fields: Fields to search (content).
+        ordering_fields: Fields available for ordering.
 
     Methods:
         get_queryset: Filters entries to only return current user's entries.
@@ -51,6 +68,22 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
     Example:
         # List journal entries
         GET /api/journal/
+        Authorization: Bearer <token>
+
+        # Filter by mood
+        GET /api/journal/?mood=good
+        Authorization: Bearer <token>
+
+        # Filter by date range
+        GET /api/journal/?date_after=2025-12-01&date_before=2025-12-31
+        Authorization: Bearer <token>
+
+        # Filter by entry type
+        GET /api/journal/?entry_type=freeform
+        Authorization: Bearer <token>
+
+        # Search in content
+        GET /api/journal/?search=productive
         Authorization: Bearer <token>
 
         # Create freeform entry
@@ -84,6 +117,10 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
     """
     serializer_class = JournalEntrySerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = JournalEntryFilter
+    search_fields = ['content']
+    ordering_fields = ['date', 'time', 'mood', 'created_at']
+    ordering = ['-date', '-time']
 
     def get_queryset(self):
         """

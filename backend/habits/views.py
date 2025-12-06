@@ -30,9 +30,34 @@ Security:
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
+from django_filters import rest_framework as filters
 
 from .models import Habit, HabitLog
 from .serializers import HabitSerializer, HabitLogSerializer
+
+
+class HabitFilter(filters.FilterSet):
+    """Filter for habits by category and frequency."""
+    category = filters.ChoiceFilter(choices=Habit.CATEGORY_CHOICES)
+    frequency = filters.CharFilter()
+    created_after = filters.DateFilter(field_name='created_at', lookup_expr='gte')
+    created_before = filters.DateFilter(field_name='created_at', lookup_expr='lte')
+
+    class Meta:
+        model = Habit
+        fields = ['category', 'frequency']
+
+
+class HabitLogFilter(filters.FilterSet):
+    """Filter for habit logs by date range and habit."""
+    habit = filters.NumberFilter()
+    date = filters.DateFilter()
+    date_after = filters.DateFilter(field_name='date', lookup_expr='gte')
+    date_before = filters.DateFilter(field_name='date', lookup_expr='lte')
+
+    class Meta:
+        model = HabitLog
+        fields = ['habit', 'date']
 
 
 class HabitViewSet(viewsets.ModelViewSet):
@@ -46,6 +71,9 @@ class HabitViewSet(viewsets.ModelViewSet):
     Attributes:
         serializer_class: HabitSerializer for request/response handling.
         permission_classes: Requires JWT authentication.
+        filterset_class: HabitFilter for filtering by category/frequency.
+        search_fields: Fields to search (name).
+        ordering_fields: Fields available for ordering.
 
     Methods:
         get_queryset: Filters habits to only return current user's habits.
@@ -54,6 +82,14 @@ class HabitViewSet(viewsets.ModelViewSet):
     Example:
         # List habits
         GET /api/habits/
+        Authorization: Bearer <token>
+
+        # Filter by category
+        GET /api/habits/?category=health
+        Authorization: Bearer <token>
+
+        # Search by name
+        GET /api/habits/?search=exercise
         Authorization: Bearer <token>
 
         # Create habit
@@ -68,6 +104,10 @@ class HabitViewSet(viewsets.ModelViewSet):
     """
     serializer_class = HabitSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = HabitFilter
+    search_fields = ['name']
+    ordering_fields = ['name', 'category', 'created_at']
+    ordering = ['-created_at']
 
     def get_queryset(self):
         """
@@ -99,6 +139,8 @@ class HabitLogViewSet(viewsets.ModelViewSet):
     Attributes:
         serializer_class: HabitLogSerializer for request/response handling.
         permission_classes: Requires JWT authentication.
+        filterset_class: HabitLogFilter for filtering by date range/habit.
+        ordering_fields: Fields available for ordering.
 
     Methods:
         get_queryset: Filters logs to habits owned by current user.
@@ -112,6 +154,14 @@ class HabitLogViewSet(viewsets.ModelViewSet):
         GET /api/habits/logs/
         Authorization: Bearer <token>
 
+        # Filter by date range
+        GET /api/habits/logs/?date_after=2025-12-01&date_before=2025-12-31
+        Authorization: Bearer <token>
+
+        # Filter by habit
+        GET /api/habits/logs/?habit=1
+        Authorization: Bearer <token>
+
         # Log a habit completion
         POST /api/habits/logs/
         Authorization: Bearer <token>
@@ -123,6 +173,9 @@ class HabitLogViewSet(viewsets.ModelViewSet):
     """
     serializer_class = HabitLogSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = HabitLogFilter
+    ordering_fields = ['date', 'created_at']
+    ordering = ['-date']
 
     def get_queryset(self):
         """

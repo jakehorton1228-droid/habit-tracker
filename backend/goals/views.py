@@ -27,12 +27,44 @@ Security:
     - Users can only access their own goals and progress entries
     - Attempting to log progress for other users' goals raises PermissionDenied
 """
+from django.db import models
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
+from django_filters import rest_framework as filters
 
 from .models import Goal, GoalProgress
 from .serializers import GoalSerializer, GoalProgressSerializer
+
+
+class GoalFilter(filters.FilterSet):
+    """Filter for goals by completion status and date range."""
+    is_complete = filters.BooleanFilter(method='filter_is_complete')
+    end_date_after = filters.DateFilter(field_name='end_date', lookup_expr='gte')
+    end_date_before = filters.DateFilter(field_name='end_date', lookup_expr='lte')
+    has_deadline = filters.BooleanFilter(field_name='end_date', lookup_expr='isnull', exclude=True)
+
+    class Meta:
+        model = Goal
+        fields = ['is_complete', 'has_deadline']
+
+    def filter_is_complete(self, queryset, name, value):
+        """Filter goals by completion status."""
+        if value:
+            return queryset.filter(current_value__gte=models.F('target_value'))
+        return queryset.filter(current_value__lt=models.F('target_value'))
+
+
+class GoalProgressFilter(filters.FilterSet):
+    """Filter for goal progress by date range and goal."""
+    goal = filters.NumberFilter()
+    date = filters.DateFilter()
+    date_after = filters.DateFilter(field_name='date', lookup_expr='gte')
+    date_before = filters.DateFilter(field_name='date', lookup_expr='lte')
+
+    class Meta:
+        model = GoalProgress
+        fields = ['goal', 'date']
 
 
 class GoalViewSet(viewsets.ModelViewSet):
@@ -46,6 +78,9 @@ class GoalViewSet(viewsets.ModelViewSet):
     Attributes:
         serializer_class: GoalSerializer for request/response handling.
         permission_classes: Requires JWT authentication.
+        filterset_class: GoalFilter for filtering by completion/deadline.
+        search_fields: Fields to search (name, description).
+        ordering_fields: Fields available for ordering.
 
     Methods:
         get_queryset: Filters goals to only return current user's goals.
@@ -54,6 +89,18 @@ class GoalViewSet(viewsets.ModelViewSet):
     Example:
         # List goals
         GET /api/goals/
+        Authorization: Bearer <token>
+
+        # Filter incomplete goals
+        GET /api/goals/?is_complete=false
+        Authorization: Bearer <token>
+
+        # Filter goals with deadlines
+        GET /api/goals/?has_deadline=true
+        Authorization: Bearer <token>
+
+        # Search by name
+        GET /api/goals/?search=savings
         Authorization: Bearer <token>
 
         # Create goal
@@ -73,6 +120,10 @@ class GoalViewSet(viewsets.ModelViewSet):
     """
     serializer_class = GoalSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = GoalFilter
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'target_value', 'current_value', 'end_date', 'created_at']
+    ordering = ['-created_at']
 
     def get_queryset(self):
         """
@@ -104,6 +155,8 @@ class GoalProgressViewSet(viewsets.ModelViewSet):
     Attributes:
         serializer_class: GoalProgressSerializer for request/response handling.
         permission_classes: Requires JWT authentication.
+        filterset_class: GoalProgressFilter for filtering by date range/goal.
+        ordering_fields: Fields available for ordering.
 
     Methods:
         get_queryset: Filters entries to goals owned by current user.
@@ -117,6 +170,14 @@ class GoalProgressViewSet(viewsets.ModelViewSet):
         GET /api/goals/progress/
         Authorization: Bearer <token>
 
+        # Filter by goal
+        GET /api/goals/progress/?goal=1
+        Authorization: Bearer <token>
+
+        # Filter by date range
+        GET /api/goals/progress/?date_after=2025-12-01
+        Authorization: Bearer <token>
+
         # Log progress toward a goal
         POST /api/goals/progress/
         Authorization: Bearer <token>
@@ -128,6 +189,9 @@ class GoalProgressViewSet(viewsets.ModelViewSet):
     """
     serializer_class = GoalProgressSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = GoalProgressFilter
+    ordering_fields = ['date', 'amount', 'created_at']
+    ordering = ['-date']
 
     def get_queryset(self):
         """
