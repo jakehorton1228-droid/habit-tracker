@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react'
-import { goals as initialGoals, goalCategories } from '../utils/mockData'
+import { useState, useEffect, useRef } from 'react'
+import { goalsAPI } from '../services/api'
+import { goalCategories } from '../utils/constants'
 import { useToast } from '../hooks/useToast'
 import Modal from '../components/Modal'
 
@@ -19,47 +20,14 @@ function ProgressBar({ current, target, color }) {
   )
 }
 
-function MilestoneList({ milestones, current, onToggle, color }) {
-  return (
-    <div className="space-y-2 mt-4">
-      <div className="text-xs text-muted uppercase tracking-wide mb-2">Milestones</div>
-      {milestones.map((m) => {
-        const reached = current >= m.target
-        return (
-          <div
-            key={m.id}
-            className={`flex items-center gap-3 p-2 rounded-lg transition-all ${
-              reached ? 'bg-white/5' : 'opacity-60'
-            }`}
-          >
-            <button
-              onClick={() => onToggle(m.id)}
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                m.completed
-                  ? 'border-transparent text-white text-xs'
-                  : 'border-white/30 hover:border-white/50'
-              }`}
-              style={m.completed ? { background: color } : undefined}
-            >
-              {m.completed && '✓'}
-            </button>
-            <span className={`text-sm flex-1 ${m.completed ? 'line-through opacity-70' : ''}`}>
-              {m.title}
-            </span>
-            <span className="text-xs text-muted">{m.target}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function GoalCard({ goal, category, onUpdate, onDelete, onUpdateMilestone }) {
+function GoalCard({ goal, category, progress, onAddProgress, onDelete }) {
   const [expanded, setExpanded] = useState(false)
-  const percent = Math.round((goal.current / goal.target) * 100)
+  const current = Number(goal.current_value)
+  const target = Number(goal.target_value)
+  const percent = target > 0 ? Math.round((current / target) * 100) : 0
 
-  const daysLeft = goal.deadline
-    ? Math.ceil((new Date(goal.deadline) - new Date()) / 86400000)
+  const daysLeft = goal.end_date
+    ? Math.ceil((new Date(goal.end_date) - new Date()) / 86400000)
     : null
 
   return (
@@ -78,7 +46,7 @@ function GoalCard({ goal, category, onUpdate, onDelete, onUpdateMilestone }) {
             {category?.icon}
           </span>
           <div>
-            <h4 className="m-0 font-semibold text-base">{goal.title}</h4>
+            <h4 className="m-0 font-semibold text-base">{goal.name}</h4>
             <span className="text-xs text-muted">{category?.name}</span>
           </div>
         </div>
@@ -94,21 +62,21 @@ function GoalCard({ goal, category, onUpdate, onDelete, onUpdateMilestone }) {
         </div>
       </div>
 
-      <ProgressBar current={goal.current} target={goal.target} color={category?.color || '#a855f7'} />
+      <ProgressBar current={current} target={target} color={category?.color || '#a855f7'} />
 
       <div className="flex items-center justify-between mt-3">
         <div className="text-sm text-muted">
-          {goal.current} / {goal.target} {goal.unit}
+          {current} / {target} {goal.unit}
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => onUpdate(goal.id, Math.max(0, goal.current - 1))}
+            onClick={() => onAddProgress(goal.id, -1)}
             className="w-8 h-8 rounded-lg bg-white/5 border-white/10 text-muted hover:bg-white/10 hover:text-text text-sm"
           >
             −
           </button>
           <button
-            onClick={() => onUpdate(goal.id, Math.min(goal.target, goal.current + 1))}
+            onClick={() => onAddProgress(goal.id, 1)}
             className="w-8 h-8 rounded-lg bg-white/5 border-white/10 text-muted hover:bg-white/10 hover:text-text text-sm"
           >
             +
@@ -124,17 +92,27 @@ function GoalCard({ goal, category, onUpdate, onDelete, onUpdateMilestone }) {
         onClick={() => setExpanded(!expanded)}
         className="w-full mt-3 py-2 text-xs text-muted bg-transparent border-0 hover:text-text"
       >
-        {expanded ? '▲ Hide milestones' : `▼ Show milestones (${goal.milestones.filter(m => m.completed).length}/${goal.milestones.length})`}
+        {expanded ? '▲ Hide details' : `▼ Show details (${progress.length} entries)`}
       </button>
 
       {expanded && (
         <>
-          <MilestoneList
-            milestones={goal.milestones}
-            current={goal.current}
-            onToggle={(milestoneId) => onUpdateMilestone(goal.id, milestoneId)}
-            color={category?.color || '#a855f7'}
-          />
+          <div className="space-y-2 mt-4">
+            <div className="text-xs text-muted uppercase tracking-wide mb-2">Progress History</div>
+            {progress.length === 0 ? (
+              <p className="text-sm text-muted">No progress entries yet</p>
+            ) : (
+              progress.slice(0, 5).map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-2 rounded-lg bg-white/5"
+                >
+                  <span className="text-sm">{p.note || 'Progress update'}</span>
+                  <span className="text-xs text-muted">+{p.amount} on {p.date}</span>
+                </div>
+              ))
+            )}
+          </div>
           <div className="flex justify-end mt-4 pt-3 border-t border-white/5">
             <button
               onClick={() => onDelete(goal.id)}
@@ -149,51 +127,25 @@ function GoalCard({ goal, category, onUpdate, onDelete, onUpdateMilestone }) {
   )
 }
 
-function GoalForm({ onAdd, onCancel }) {
-  const [title, setTitle] = useState('')
+function GoalForm({ onAdd, onCancel, loading }) {
+  const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('personal')
-  const [target, setTarget] = useState('')
+  const [targetValue, setTargetValue] = useState('')
   const [unit, setUnit] = useState('')
-  const [deadline, setDeadline] = useState('')
-  const [milestones, setMilestones] = useState([])
-  const [newMilestone, setNewMilestone] = useState({ title: '', target: '' })
-
-  function addMilestone() {
-    if (!newMilestone.title.trim() || !newMilestone.target) return
-    setMilestones([...milestones, {
-      id: Date.now(),
-      title: newMilestone.title.trim(),
-      target: Number(newMilestone.target),
-      completed: false,
-    }])
-    setNewMilestone({ title: '', target: '' })
-  }
-
-  function removeMilestone(id) {
-    setMilestones(milestones.filter(m => m.id !== id))
-  }
+  const [endDate, setEndDate] = useState('')
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (!title.trim() || !target) return
+    if (!name.trim() || !targetValue) return
 
-    const goal = {
-      id: Date.now(),
-      title: title.trim(),
+    onAdd({
+      name: name.trim(),
       description: description.trim(),
-      category,
-      current: 0,
-      target: Number(target),
+      target_value: targetValue,
       unit: unit.trim() || 'units',
-      deadline: deadline || null,
-      createdAt: new Date().toISOString().slice(0, 10),
-      milestones: milestones.length > 0 ? milestones : [
-        { id: 1, title: 'Goal complete!', target: Number(target), completed: false }
-      ],
-    }
-
-    onAdd(goal)
+      end_date: endDate || null,
+    })
   }
 
   return (
@@ -201,8 +153,8 @@ function GoalForm({ onAdd, onCancel }) {
       <div>
         <label className="block text-sm text-muted mb-1.5">Goal title *</label>
         <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           placeholder="What do you want to achieve?"
           className="w-full px-4 py-2.5 rounded-lg border border-white/10 bg-white/5 text-text focus:outline-none focus:border-accent-2"
           required
@@ -240,8 +192,8 @@ function GoalForm({ onAdd, onCancel }) {
           <label className="block text-sm text-muted mb-1.5">Deadline (optional)</label>
           <input
             type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
             className="w-full px-4 py-2.5 rounded-lg border border-white/10 bg-white/5 text-text focus:outline-none focus:border-accent-2"
           />
         </div>
@@ -252,8 +204,8 @@ function GoalForm({ onAdd, onCancel }) {
           <label className="block text-sm text-muted mb-1.5">Target value *</label>
           <input
             type="number"
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
+            value={targetValue}
+            onChange={(e) => setTargetValue(e.target.value)}
             placeholder="e.g. 100"
             min="1"
             className="w-full px-4 py-2.5 rounded-lg border border-white/10 bg-white/5 text-text focus:outline-none focus:border-accent-2"
@@ -271,48 +223,6 @@ function GoalForm({ onAdd, onCancel }) {
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm text-muted mb-1.5">Milestones (optional)</label>
-        <div className="space-y-2">
-          {milestones.map((m) => (
-            <div key={m.id} className="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-              <span className="flex-1 text-sm">{m.title}</span>
-              <span className="text-xs text-muted">{m.target}</span>
-              <button
-                type="button"
-                onClick={() => removeMilestone(m.id)}
-                className="w-6 h-6 rounded bg-transparent border-0 text-muted hover:text-error text-sm"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <input
-              value={newMilestone.title}
-              onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })}
-              placeholder="Milestone name"
-              className="flex-1 px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-text text-sm focus:outline-none focus:border-accent-2"
-            />
-            <input
-              type="number"
-              value={newMilestone.target}
-              onChange={(e) => setNewMilestone({ ...newMilestone, target: e.target.value })}
-              placeholder="At"
-              min="1"
-              className="w-20 px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-text text-sm focus:outline-none focus:border-accent-2"
-            />
-            <button
-              type="button"
-              onClick={addMilestone}
-              className="px-3 py-2 text-sm bg-white/5 border-white/10 text-muted hover:bg-white/10 hover:text-text"
-            >
-              Add
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div className="flex gap-2 justify-end pt-2">
         <button
           type="button"
@@ -321,91 +231,141 @@ function GoalForm({ onAdd, onCancel }) {
         >
           Cancel
         </button>
-        <button type="submit">Create Goal</button>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Creating...' : 'Create Goal'}
+        </button>
       </div>
     </form>
   )
 }
 
 export default function Goals() {
-  const [goals, setGoals] = useState(initialGoals)
+  const [goals, setGoals] = useState([])
+  const [progress, setProgress] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [formLoading, setFormLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const toast = useToast()
   const previousState = useRef(null)
 
-  function handleUpdate(id, newCurrent) {
-    const goal = goals.find(g => g.id === id)
-    previousState.current = [...goals]
+  useEffect(() => {
+    loadData()
+  }, [])
 
-    setGoals(goals.map(g => {
-      if (g.id !== id) return g
-      const updatedMilestones = g.milestones.map(m => ({
-        ...m,
-        completed: newCurrent >= m.target,
-      }))
-      return { ...g, current: newCurrent, milestones: updatedMilestones }
-    }))
+  async function loadData() {
+    try {
+      setLoading(true)
+      const [goalsRes, progressRes] = await Promise.all([
+        goalsAPI.list(),
+        goalsAPI.listProgress(),
+      ])
+      setGoals(goalsRes.data || [])
+      setProgress(progressRes.data || [])
+      setError(null)
+    } catch (err) {
+      console.error('Failed to load goals:', err.response?.data || err.message || err)
+      setError('Failed to load goals')
+      toast.error('Failed to load goals')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const delta = newCurrent - goal.current
-    const message = delta > 0
-      ? `+${delta} ${goal.unit} added to "${goal.title}"`
-      : `${delta} ${goal.unit} from "${goal.title}"`
+  async function handleAddProgress(goalId, amount) {
+    const goal = goals.find(g => g.id === goalId)
+    const newValue = Math.max(0, Math.min(Number(goal.target_value), Number(goal.current_value) + amount))
 
-    toast.success(message, {
-      onUndo: () => {
-        if (previousState.current) {
-          setGoals(previousState.current)
+    if (newValue === Number(goal.current_value)) return
+
+    previousState.current = { goals: [...goals], progress: [...progress] }
+
+    try {
+      // Create progress entry
+      const progressRes = await goalsAPI.createProgress({
+        goal: goalId,
+        amount: String(Math.abs(amount)),
+        note: amount > 0 ? 'Added progress' : 'Removed progress',
+      })
+
+      // Update goal current value
+      await goalsAPI.update(goalId, { ...goal, current_value: String(newValue) })
+
+      setGoals(goals.map(g => g.id === goalId ? { ...g, current_value: String(newValue) } : g))
+      setProgress([...progress, progressRes.data])
+
+      const message = amount > 0
+        ? `+${amount} ${goal.unit} added to "${goal.name}"`
+        : `${amount} ${goal.unit} from "${goal.name}"`
+
+      toast.success(message, {
+        onUndo: async () => {
+          await goalsAPI.deleteProgress(progressRes.data.id)
+          await goalsAPI.update(goalId, { ...goal, current_value: goal.current_value })
+          loadData()
           toast.info('Change undone')
-        }
-      },
-    })
+        },
+      })
+    } catch (err) {
+      toast.error('Failed to update progress')
+    }
   }
 
-  function handleAdd(goal) {
-    previousState.current = [...goals]
-    setGoals([goal, ...goals])
-    setShowForm(false)
-    toast.success(`Goal "${goal.title}" created`, {
-      onUndo: () => {
-        if (previousState.current) {
-          setGoals(previousState.current)
+  async function handleAdd(goalData) {
+    setFormLoading(true)
+    try {
+      const response = await goalsAPI.create(goalData)
+      setGoals([response.data, ...goals])
+      setShowForm(false)
+      toast.success(`Goal "${goalData.name}" created`, {
+        onUndo: async () => {
+          await goalsAPI.delete(response.data.id)
+          setGoals(g => g.filter(goal => goal.id !== response.data.id))
           toast.info('Goal removed')
-        }
-      },
-    })
+        },
+      })
+    } catch (err) {
+      toast.error('Failed to create goal')
+    } finally {
+      setFormLoading(false)
+    }
   }
 
-  function handleDelete(id) {
-    const goal = goals.find(g => g.id === id)
-    previousState.current = [...goals]
-    setGoals(goals.filter(g => g.id !== id))
-    toast.success(`Goal "${goal.title}" deleted`, {
-      onUndo: () => {
-        if (previousState.current) {
-          setGoals(previousState.current)
-          toast.info('Goal restored')
-        }
-      },
-    })
+  async function handleDelete(goalId) {
+    const goal = goals.find(g => g.id === goalId)
+    try {
+      await goalsAPI.delete(goalId)
+      setGoals(goals.filter(g => g.id !== goalId))
+      setProgress(progress.filter(p => p.goal !== goalId))
+      toast.success(`Goal "${goal.name}" deleted`)
+    } catch (err) {
+      toast.error('Failed to delete goal')
+    }
   }
 
-  function handleUpdateMilestone(goalId, milestoneId) {
-    previousState.current = [...goals]
-    setGoals(goals.map(g => {
-      if (g.id !== goalId) return g
-      return {
-        ...g,
-        milestones: g.milestones.map(m =>
-          m.id === milestoneId ? { ...m, completed: !m.completed } : m
-        ),
-      }
-    }))
-  }
-
-  const completedGoals = goals.filter(g => g.current >= g.target).length
+  const completedGoals = goals.filter(g => Number(g.current_value) >= Number(g.target_value)).length
   const totalProgress = goals.length > 0
-    ? Math.round(goals.reduce((sum, g) => sum + (g.current / g.target) * 100, 0) / goals.length)
+    ? Math.round(goals.reduce((sum, g) => sum + (Number(g.current_value) / Number(g.target_value)) * 100, 0) / goals.length)
     : 0
+
+  if (loading) {
+    return (
+      <section className="p-6 max-w-[900px] mx-auto">
+        <div className="text-center text-muted">Loading goals...</div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="p-6 max-w-[900px] mx-auto">
+        <div className="text-center text-error">{error}</div>
+        <button onClick={loadData} className="mt-4 mx-auto block">
+          Retry
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section className="p-6 max-w-[900px] mx-auto">
@@ -445,14 +405,15 @@ export default function Goals() {
       <div className="grid gap-4 md:grid-cols-2">
         {goals.map((goal) => {
           const category = goalCategories.find(c => c.id === goal.category)
+          const goalProgress = progress.filter(p => p.goal === goal.id)
           return (
             <GoalCard
               key={goal.id}
               goal={goal}
               category={category}
-              onUpdate={handleUpdate}
+              progress={goalProgress}
+              onAddProgress={handleAddProgress}
               onDelete={handleDelete}
-              onUpdateMilestone={handleUpdateMilestone}
             />
           )
         })}
@@ -466,7 +427,7 @@ export default function Goals() {
       )}
 
       <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Create New Goal">
-        <GoalForm onAdd={handleAdd} onCancel={() => setShowForm(false)} />
+        <GoalForm onAdd={handleAdd} onCancel={() => setShowForm(false)} loading={formLoading} />
       </Modal>
     </section>
   )

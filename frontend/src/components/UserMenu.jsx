@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../hooks/useSettings'
+import { useAuth } from '../hooks/useAuth'
 
-/**
- * User account dropdown menu with profile access and preference settings.
- * Allows changing theme and week start day preferences.
- */
 export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false)
   const { settings, updateSetting } = useSettings()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -21,8 +21,11 @@ export default function UserMenu() {
   }, [])
 
   function handleSignOut() {
-    alert('Sign out functionality coming soon!')
+    logout()
+    navigate('/login')
   }
+
+  const initial = user?.username?.charAt(0).toUpperCase() || 'U'
 
   return (
     <div className="relative ml-auto" ref={menuRef}>
@@ -31,7 +34,7 @@ export default function UserMenu() {
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="w-7 h-7 bg-gradient-to-br from-accent to-accent-2 rounded-full flex items-center justify-center font-semibold text-sm">
-          U
+          {initial}
         </span>
         <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
           <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
@@ -48,10 +51,13 @@ export default function UserMenu() {
         >
           <div className="py-1">
             <div className="px-3 py-2 text-[0.7rem] uppercase tracking-wider text-muted font-semibold">Account</div>
-            <button className="flex items-center gap-2.5 w-full px-3 py-2.5 bg-transparent border-none rounded-lg text-text text-sm cursor-pointer text-left hover:bg-accent-2/15 hover:transform-none hover:shadow-none transition-colors">
+            <div className="flex items-center gap-2.5 w-full px-3 py-2.5 text-text text-sm">
               <span className="text-base w-5 text-center">👤</span>
-              Profile
-            </button>
+              <span>{user?.username || 'User'}</span>
+            </div>
+            {user?.email && (
+              <div className="px-3 pb-2 text-xs text-muted pl-10">{user.email}</div>
+            )}
           </div>
 
           <div className="py-1">

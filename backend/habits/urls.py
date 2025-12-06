@@ -5,7 +5,8 @@ from rest_framework.routers import DefaultRouter
 from .views import HabitViewSet, HabitLogViewSet
 
 router = DefaultRouter()
-router.register(r'', HabitViewSet, basename='habit')
+# Register logs first so it takes precedence over the greedy '' pattern
 router.register(r'logs', HabitLogViewSet, basename='habitlog')
+router.register(r'', HabitViewSet, basename='habit')
 
 urlpatterns = router.urls

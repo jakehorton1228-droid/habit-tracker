@@ -1,30 +1,49 @@
-import { useState, useRef } from 'react'
-import { habits as initialHabits, categories } from '../utils/mockData'
+import { useState, useEffect, useRef } from 'react'
+import { habitsAPI } from '../services/api'
+import { categories } from '../utils/constants'
 import Heatmap from '../components/Heatmap'
 import CompletionChart from '../components/CompletionChart'
 import { useToast } from '../hooks/useToast'
 
-function HabitItem({ h, category, onToggle }) {
+function HabitItem({ habit, category, logs, onToggle, onDelete }) {
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [note, setNote] = useState('')
 
+  const today = new Date().toISOString().slice(0, 10)
+  const todayLog = logs.find((log) => log.date === today)
+  const doneToday = !!todayLog
+
+  // Calculate streak from logs
+  const sortedDates = [...new Set(logs.map((l) => l.date))].sort().reverse()
+  let streak = 0
+  const checkDate = new Date()
+  for (const date of sortedDates) {
+    const dateStr = checkDate.toISOString().slice(0, 10)
+    if (date === dateStr) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    } else if (date < dateStr) {
+      break
+    }
+  }
+
   function handleComplete() {
-    if (!h.doneToday) {
+    if (!doneToday) {
       setShowNoteInput(true)
     } else {
-      onToggle(h.id, null)
+      onToggle(habit.id, todayLog.id, null)
     }
   }
 
   function submitNote(e) {
     e.preventDefault()
-    onToggle(h.id, note.trim() || null)
+    onToggle(habit.id, null, note.trim() || null)
     setNote('')
     setShowNoteInput(false)
   }
 
   function skipNote() {
-    onToggle(h.id, null)
+    onToggle(habit.id, null, null)
     setNote('')
     setShowNoteInput(false)
   }
@@ -32,7 +51,7 @@ function HabitItem({ h, category, onToggle }) {
   return (
     <li
       className={`flex items-center justify-between gap-4 p-4 rounded-lg border transition-all duration-200 hover:translate-x-1 ${
-        h.doneToday
+        doneToday
           ? 'border-success/30 bg-gradient-to-br from-success/[0.08] to-success/[0.02]'
           : 'border-white/5 bg-gradient-to-br from-white/[0.03] to-white/[0.01] hover:border-white/10'
       }`}
@@ -44,8 +63,8 @@ function HabitItem({ h, category, onToggle }) {
             style={{ background: category?.color || '#888' }}
             title={category?.name}
           />
-          <span className={`font-semibold ${h.doneToday ? 'line-through opacity-70' : ''}`}>
-            {h.title}
+          <span className={`font-semibold ${doneToday ? 'line-through opacity-70' : ''}`}>
+            {habit.name}
           </span>
           {category && (
             <span
@@ -55,12 +74,19 @@ function HabitItem({ h, category, onToggle }) {
               {category.name}
             </span>
           )}
+          <button
+            onClick={() => onDelete(habit.id)}
+            className="ml-2 text-xs text-muted hover:text-error transition-colors"
+            title="Delete habit"
+          >
+            ✕
+          </button>
         </div>
         <div className="flex gap-4 text-sm">
           <span className="text-accent font-semibold">
-            🔥 {h.streak} day{h.streak !== 1 ? 's' : ''}
+            🔥 {streak} day{streak !== 1 ? 's' : ''}
           </span>
-          <span className="text-muted">Best: {h.bestStreak}</span>
+          <span className="text-muted">{habit.frequency}</span>
         </div>
       </div>
 
@@ -85,13 +111,13 @@ function HabitItem({ h, category, onToggle }) {
       ) : (
         <button
           className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap ${
-            h.doneToday
+            doneToday
               ? 'bg-gradient-to-br from-success/20 to-success/10 border-success/30 text-success hover:bg-error/20 hover:border-error/30 hover:text-error'
               : ''
           }`}
           onClick={handleComplete}
         >
-          {h.doneToday ? '✓ Done' : 'Mark Done'}
+          {doneToday ? '✓ Done' : 'Mark Done'}
         </button>
       )}
     </li>
@@ -99,21 +125,24 @@ function HabitItem({ h, category, onToggle }) {
 }
 
 function HabitForm({ onAdd, categories }) {
-  const [title, setTitle] = useState('')
+  const [name, setName] = useState('')
   const [category, setCategory] = useState('health')
+  const [loading, setLoading] = useState(false)
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault()
-    if (!title.trim()) return
-    onAdd(title.trim(), category)
-    setTitle('')
+    if (!name.trim() || loading) return
+    setLoading(true)
+    await onAdd(name.trim(), category)
+    setName('')
+    setLoading(false)
   }
 
   return (
     <form className="flex gap-2 mt-3" onSubmit={submit}>
       <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
         placeholder="New habit"
         className="flex-1 px-3 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-text text-sm focus:outline-none focus:border-accent-2"
       />
@@ -129,78 +158,147 @@ function HabitForm({ onAdd, categories }) {
           </option>
         ))}
       </select>
-      <button type="submit">Add</button>
+      <button type="submit" disabled={loading}>
+        {loading ? '...' : 'Add'}
+      </button>
     </form>
   )
 }
 
 export default function Habits() {
-  const [list, setList] = useState(initialHabits)
+  const [habits, setHabits] = useState([])
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const toast = useToast()
   const previousState = useRef(null)
 
-  function handleToggle(id, note) {
-    const today = new Date().toISOString().slice(0, 10)
-    const habit = list.find((h) => h.id === id)
-    const wasDone = habit.doneToday
+  useEffect(() => {
+    loadData()
+  }, [])
 
-    previousState.current = { id, list: [...list] }
-
-    setList((l) => l.map((h) => {
-      if (h.id !== id) return h
-      const newHistory = wasDone
-        ? h.history.filter((entry) => entry.date !== today)
-        : [...h.history, { date: today, note }]
-      return {
-        ...h,
-        doneToday: !wasDone,
-        streak: wasDone ? Math.max(0, h.streak - 1) : h.streak + 1,
-        history: newHistory,
-      }
-    }))
-
-    const message = wasDone
-      ? `Unmarked "${habit.title}" as done`
-      : `Completed "${habit.title}"${note ? ` - ${note}` : ''}`
-
-    toast.success(message, {
-      onUndo: () => {
-        if (previousState.current) {
-          setList(previousState.current.list)
-          toast.info('Action undone')
-        }
-      },
-    })
-  }
-
-  function handleAdd(title, category) {
-    const id = Math.max(0, ...list.map((i) => i.id)) + 1
-    const newHabit = {
-      id,
-      title,
-      category,
-      streak: 0,
-      bestStreak: 0,
-      doneToday: false,
-      history: [],
+  async function loadData() {
+    try {
+      setLoading(true)
+      const [habitsRes, logsRes] = await Promise.all([
+        habitsAPI.list(),
+        habitsAPI.listLogs(),
+      ])
+      setHabits(habitsRes.data || [])
+      setLogs(logsRes.data || [])
+      setError(null)
+    } catch (err) {
+      console.error('Failed to load habits:', err.response?.data || err.message || err)
+      setError('Failed to load habits')
+      toast.error('Failed to load habits')
+    } finally {
+      setLoading(false)
     }
-
-    previousState.current = { id, list: [...list] }
-
-    setList((l) => [newHabit, ...l])
-
-    toast.success(`Added "${title}"`, {
-      onUndo: () => {
-        if (previousState.current) {
-          setList(previousState.current.list)
-          toast.info('Action undone')
-        }
-      },
-    })
   }
 
-  const allHistory = list.flatMap((h) => h.history)
-  const uniqueDates = [...new Set(allHistory.map((h) => h.date))].map((date) => ({ date }))
+  async function handleToggle(habitId, logId, note) {
+    const today = new Date().toISOString().slice(0, 10)
+
+    if (logId) {
+      // Undo - delete the log
+      previousState.current = { logs: [...logs] }
+      try {
+        await habitsAPI.deleteLog(logId)
+        setLogs((l) => l.filter((log) => log.id !== logId))
+        const habit = habits.find((h) => h.id === habitId)
+        toast.success(`Unmarked "${habit.name}" as done`, {
+          onUndo: async () => {
+            await habitsAPI.createLog({ habit: habitId, date: today, note: '' })
+            loadData()
+            toast.info('Action undone')
+          },
+        })
+      } catch (err) {
+        toast.error('Failed to update habit')
+      }
+    } else {
+      // Complete - create a log
+      previousState.current = { logs: [...logs] }
+      try {
+        const response = await habitsAPI.createLog({ habit: habitId, date: today, note: note || '' })
+        setLogs((l) => [...l, response.data])
+        const habit = habits.find((h) => h.id === habitId)
+        toast.success(`Completed "${habit.name}"${note ? ` - ${note}` : ''}`, {
+          onUndo: async () => {
+            await habitsAPI.deleteLog(response.data.id)
+            setLogs((l) => l.filter((log) => log.id !== response.data.id))
+            toast.info('Action undone')
+          },
+        })
+      } catch (err) {
+        toast.error('Failed to log habit')
+      }
+    }
+  }
+
+  async function handleAdd(name, category) {
+    try {
+      const response = await habitsAPI.create({ name, category, frequency: 'daily' })
+      setHabits((h) => [response.data, ...h])
+      toast.success(`Added "${name}"`, {
+        onUndo: async () => {
+          await habitsAPI.delete(response.data.id)
+          setHabits((h) => h.filter((habit) => habit.id !== response.data.id))
+          toast.info('Action undone')
+        },
+      })
+    } catch (err) {
+      toast.error('Failed to add habit')
+    }
+  }
+
+  async function handleDelete(habitId) {
+    const habit = habits.find((h) => h.id === habitId)
+    try {
+      await habitsAPI.delete(habitId)
+      setHabits((h) => h.filter((item) => item.id !== habitId))
+      setLogs((l) => l.filter((log) => log.habit !== habitId))
+      toast.success(`Deleted "${habit.name}"`)
+    } catch (err) {
+      toast.error('Failed to delete habit')
+    }
+  }
+
+  // Build history for heatmap from logs
+  const uniqueDates = [...new Set(logs.map((l) => l.date))].map((date) => ({ date }))
+
+  // Build habits with computed properties for chart
+  const habitsWithStats = habits.map((habit) => {
+    const habitLogs = logs.filter((l) => l.habit === habit.id)
+    const today = new Date().toISOString().slice(0, 10)
+    const doneToday = habitLogs.some((l) => l.date === today)
+    return {
+      ...habit,
+      title: habit.name,
+      doneToday,
+      history: habitLogs.map((l) => ({ date: l.date, note: l.note })),
+      streak: habitLogs.length,
+    }
+  })
+
+  if (loading) {
+    return (
+      <section className="p-6 max-w-[800px] mx-auto">
+        <div className="text-center text-muted">Loading habits...</div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="p-6 max-w-[800px] mx-auto">
+        <div className="text-center text-error">{error}</div>
+        <button onClick={loadData} className="mt-4 mx-auto block">
+          Retry
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section className="p-6 max-w-[800px] mx-auto">
@@ -221,21 +319,28 @@ export default function Habits() {
       </div>
 
       <div className="mb-6">
-        <CompletionChart habits={list} />
+        <CompletionChart habits={habitsWithStats} />
       </div>
 
       <div className="flex flex-col gap-3">
-        {list.map((h) => {
-          const category = categories.find((c) => c.id === h.category)
-          return (
-            <HabitItem
-              key={h.id}
-              h={h}
-              category={category}
-              onToggle={handleToggle}
-            />
-          )
-        })}
+        {habits.length === 0 ? (
+          <p className="text-center text-muted">No habits yet. Add one above!</p>
+        ) : (
+          habits.map((habit) => {
+            const category = categories.find((c) => c.id === habit.category)
+            const habitLogs = logs.filter((l) => l.habit === habit.id)
+            return (
+              <HabitItem
+                key={habit.id}
+                habit={habit}
+                category={category}
+                logs={habitLogs}
+                onToggle={handleToggle}
+                onDelete={handleDelete}
+              />
+            )
+          })
+        )}
       </div>
     </section>
   )

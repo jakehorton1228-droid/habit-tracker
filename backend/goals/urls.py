@@ -6,7 +6,8 @@ from .views import GoalViewSet, GoalProgressViewSet
 
 
 router = DefaultRouter()
-router.register(r'', GoalViewSet, basename='goal')
+# Register progress first so it takes precedence over the greedy '' pattern
 router.register(r'progress', GoalProgressViewSet, basename='goalprogress')
+router.register(r'', GoalViewSet, basename='goal')
 
 urlpatterns = router.urls

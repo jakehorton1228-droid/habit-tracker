@@ -5,7 +5,7 @@
  * @param {Array} props.history - Array of completion objects with date strings
  * @param {string} [props.color='#a855f7'] - Accent color for completed days
  */
-export default function Heatmap({ history, color = '#a855f7' }) {
+export default function Heatmap({ history = [], color = '#a855f7' }) {
   const days = []
   const today = new Date()
   const completedDates = new Set(history.map((h) => h.date))

@@ -3,16 +3,10 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { useState } from 'react'
-import { calendarEvents as initialEvents } from '../../utils/mockData'
 import { useSettings } from '../../hooks/useSettings'
 import Modal from '../Modal'
 
-/**
- * Full-featured calendar component using FullCalendar library.
- * Supports month, week, and day views with event creation and completion.
- * Respects user's week start preference from settings.
- */
-export default function FullCalendarView() {
+export default function FullCalendarView({ events: initialEvents = [] }) {
   const [events, setEvents] = useState(initialEvents)
   const { settings } = useSettings()
   const [modalOpen, setModalOpen] = useState(false)

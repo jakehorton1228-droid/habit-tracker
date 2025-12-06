@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react'
-import { journalEntries as initialEntries, journalPrompts, moodOptions } from '../utils/mockData'
+import { useState, useEffect, useRef } from 'react'
+import { journalAPI } from '../services/api'
+import { journalPrompts, moodOptions } from '../utils/constants'
 import { useToast } from '../hooks/useToast'
 
 function MoodSelector({ value, onChange }) {
@@ -25,7 +26,7 @@ function MoodSelector({ value, onChange }) {
   )
 }
 
-function JournalForm({ onAdd, onCancel }) {
+function JournalForm({ onAdd, onCancel, loading }) {
   const [mode, setMode] = useState('freeform')
   const [mood, setMood] = useState('good')
   const [content, setContent] = useState('')
@@ -39,12 +40,12 @@ function JournalForm({ onAdd, onCancel }) {
 
     const now = new Date()
     const entry = {
-      id: Date.now(),
       date: now.toISOString().slice(0, 10),
       time: now.toTimeString().slice(0, 5),
-      type: mode,
+      entry_type: mode,
       mood,
-      ...(mode === 'freeform' ? { content: content.trim() } : { responses }),
+      content: mode === 'freeform' ? content.trim() : '',
+      responses: mode === 'prompted' ? responses : null,
     }
 
     onAdd(entry)
@@ -130,7 +131,9 @@ function JournalForm({ onAdd, onCancel }) {
             Cancel
           </button>
         )}
-        <button type="submit">Save Entry</button>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Saving...' : 'Save Entry'}
+        </button>
       </div>
     </form>
   )
@@ -138,7 +141,6 @@ function JournalForm({ onAdd, onCancel }) {
 
 function JournalEntry({ entry, onDelete }) {
   const moodData = moodOptions.find((m) => m.id === entry.mood)
-  const [expanded, setExpanded] = useState(false)
 
   return (
     <div
@@ -152,7 +154,7 @@ function JournalEntry({ entry, onDelete }) {
           <span className="text-2xl" title={moodData?.label}>{moodData?.emoji}</span>
           <div>
             <div className="text-sm text-muted">
-              {entry.time} · {entry.type === 'prompted' ? 'Guided Entry' : 'Free Write'}
+              {entry.time} · {entry.entry_type === 'prompted' ? 'Guided Entry' : 'Free Write'}
             </div>
           </div>
         </div>
@@ -165,7 +167,7 @@ function JournalEntry({ entry, onDelete }) {
       </div>
 
       <div className="mt-3">
-        {entry.type === 'freeform' ? (
+        {entry.entry_type === 'freeform' ? (
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{entry.content}</p>
         ) : (
           <div className="space-y-3">
@@ -198,12 +200,10 @@ function groupEntriesByDate(entries) {
     groups[entry.date].push(entry)
   })
 
-  // Sort entries within each day by time (newest first)
   Object.keys(groups).forEach((date) => {
     groups[date].sort((a, b) => b.time.localeCompare(a.time))
   })
 
-  // Return sorted by date (newest first)
   return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
 }
 
@@ -223,40 +223,84 @@ function formatDateHeader(dateStr) {
 }
 
 export default function Journal() {
-  const [entries, setEntries] = useState(initialEntries)
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [formLoading, setFormLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const toast = useToast()
   const previousState = useRef(null)
 
-  function handleAdd(entry) {
-    previousState.current = [...entries]
-    setEntries((prev) => [entry, ...prev])
-    setShowForm(false)
-    toast.success('Journal entry saved', {
-      onUndo: () => {
-        if (previousState.current) {
-          setEntries(previousState.current)
-          toast.info('Entry removed')
-        }
-      },
-    })
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    try {
+      setLoading(true)
+      const response = await journalAPI.list()
+      setEntries(response.data || [])
+      setError(null)
+    } catch (err) {
+      console.error('Failed to load journal:', err.response?.data || err.message || err)
+      setError('Failed to load journal entries')
+      toast.error('Failed to load journal entries')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleDelete(id) {
+  async function handleAdd(entryData) {
+    setFormLoading(true)
+    try {
+      const response = await journalAPI.create(entryData)
+      setEntries((prev) => [response.data, ...prev])
+      setShowForm(false)
+      toast.success('Journal entry saved', {
+        onUndo: async () => {
+          await journalAPI.delete(response.data.id)
+          setEntries((prev) => prev.filter((e) => e.id !== response.data.id))
+          toast.info('Entry removed')
+        },
+      })
+    } catch (err) {
+      toast.error('Failed to save entry')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  async function handleDelete(id) {
     const entry = entries.find((e) => e.id === id)
-    previousState.current = [...entries]
-    setEntries((prev) => prev.filter((e) => e.id !== id))
-    toast.success('Entry deleted', {
-      onUndo: () => {
-        if (previousState.current) {
-          setEntries(previousState.current)
-          toast.info('Entry restored')
-        }
-      },
-    })
+    try {
+      await journalAPI.delete(id)
+      setEntries((prev) => prev.filter((e) => e.id !== id))
+      toast.success('Entry deleted')
+    } catch (err) {
+      toast.error('Failed to delete entry')
+    }
   }
 
   const groupedEntries = groupEntriesByDate(entries)
+
+  if (loading) {
+    return (
+      <section className="p-6 max-w-[800px] mx-auto">
+        <div className="text-center text-muted">Loading journal...</div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="p-6 max-w-[800px] mx-auto">
+        <div className="text-center text-error">{error}</div>
+        <button onClick={loadData} className="mt-4 mx-auto block">
+          Retry
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section className="p-6 max-w-[800px] mx-auto">
@@ -278,7 +322,7 @@ export default function Journal() {
         </div>
 
         {showForm && (
-          <JournalForm onAdd={handleAdd} onCancel={() => setShowForm(false)} />
+          <JournalForm onAdd={handleAdd} onCancel={() => setShowForm(false)} loading={formLoading} />
         )}
       </div>
 

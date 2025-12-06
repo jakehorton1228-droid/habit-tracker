@@ -4,7 +4,32 @@
  * @param {Object} props
  * @param {Array} props.habits - Array of habit objects with history arrays
  */
-export default function CompletionChart({ habits }) {
+export default function CompletionChart({ habits = [] }) {
+  if (habits.length === 0) {
+    return (
+      <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
+        <div
+          className="p-4 rounded-lg border border-white/5"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+          }}
+        >
+          <h4 className="m-0 mb-4 text-sm text-accent-2 font-semibold">Weekly Completion Rate</h4>
+          <p className="text-sm text-muted text-center py-8">Add habits to see your weekly stats</p>
+        </div>
+        <div
+          className="p-4 rounded-lg border border-white/5"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+          }}
+        >
+          <h4 className="m-0 mb-4 text-sm text-accent-2 font-semibold">Habit Performance (90 days)</h4>
+          <p className="text-sm text-muted text-center py-8">No habits to track yet</p>
+        </div>
+      </div>
+    )
+  }
+
   const weeks = []
   const today = new Date()
 
