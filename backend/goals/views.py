@@ -27,8 +27,12 @@ Security:
     - Users can only access their own goals and progress entries
     - Attempting to log progress for other users' goals raises PermissionDenied
 """
+from datetime import date, timedelta
 from django.db import models
+from django.db.models import Sum, Count
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django_filters import rest_framework as filters
@@ -143,6 +147,96 @@ class GoalViewSet(viewsets.ModelViewSet):
         """
         serializer.save(user=self.request.user)
 
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        Get goal statistics and summary for the authenticated user.
+
+        Returns comprehensive statistics including:
+        - Total goals count
+        - Completed goals count
+        - In-progress goals count
+        - Goals with deadlines approaching (next 7 days)
+        - Overall completion rate
+        - Recent progress entries
+        - Per-goal progress summary
+
+        Example:
+            GET /api/goals/stats/
+            Authorization: Bearer <token>
+        """
+        user = request.user
+        today = date.today()
+        goals = Goal.objects.filter(user=user)
+        progress = GoalProgress.objects.filter(goal__user=user)
+
+        # Total goals
+        total_goals = goals.count()
+
+        # Completed vs in-progress
+        completed_goals = goals.filter(current_value__gte=models.F('target_value')).count()
+        in_progress_goals = total_goals - completed_goals
+
+        # Goals with deadlines approaching (next 7 days)
+        next_week = today + timedelta(days=7)
+        approaching_deadlines = list(goals.filter(
+            end_date__gte=today,
+            end_date__lte=next_week,
+            current_value__lt=models.F('target_value')
+        ).values('id', 'name', 'end_date', 'current_value', 'target_value', 'unit'))
+
+        # Overall completion rate (sum of progress percentages / total goals)
+        goal_stats = []
+        total_percentage = 0
+        for goal in goals:
+            if goal.target_value > 0:
+                percentage = min(100, round((float(goal.current_value) / float(goal.target_value)) * 100))
+            else:
+                percentage = 100 if goal.current_value >= goal.target_value else 0
+            total_percentage += percentage
+            goal_stats.append({
+                'id': goal.id,
+                'name': goal.name,
+                'unit': goal.unit,
+                'current_value': str(goal.current_value),
+                'target_value': str(goal.target_value),
+                'percentage': percentage,
+                'end_date': goal.end_date.isoformat() if goal.end_date else None,
+                'is_complete': goal.current_value >= goal.target_value,
+            })
+
+        overall_completion_rate = round(total_percentage / total_goals) if total_goals > 0 else 0
+
+        # Recent progress entries (last 10)
+        recent_progress = list(progress.order_by('-date', '-created_at')[:10].values(
+            'id', 'goal__name', 'amount', 'date', 'note'
+        ))
+        for entry in recent_progress:
+            entry['goal_name'] = entry.pop('goal__name')
+            entry['amount'] = str(entry['amount'])
+            entry['date'] = entry['date'].isoformat()
+
+        # Progress this week
+        week_start = today - timedelta(days=today.weekday())
+        progress_this_week = progress.filter(date__gte=week_start).aggregate(
+            total=Sum('amount'),
+            count=Count('id')
+        )
+
+        return Response({
+            'total_goals': total_goals,
+            'completed_goals': completed_goals,
+            'in_progress_goals': in_progress_goals,
+            'overall_completion_rate': overall_completion_rate,
+            'approaching_deadlines': approaching_deadlines,
+            'goal_stats': goal_stats,
+            'recent_progress': recent_progress,
+            'progress_this_week': {
+                'total': str(progress_this_week['total'] or 0),
+                'count': progress_this_week['count'],
+            },
+        })
+
 
 class GoalProgressViewSet(viewsets.ModelViewSet):
     """
@@ -204,10 +298,10 @@ class GoalProgressViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Validate goal ownership and save the progress entry.
+        Validate goal ownership, save the progress entry, and update goal's current_value.
 
         Ensures that users can only create progress entries for goals they own.
-        This prevents users from logging progress for other users' goals.
+        Automatically adds the progress amount to the goal's current_value.
 
         Args:
             serializer: Validated GoalProgressSerializer instance.
@@ -218,4 +312,38 @@ class GoalProgressViewSet(viewsets.ModelViewSet):
         goal = serializer.validated_data.get('goal')
         if goal.user != self.request.user:
             raise PermissionDenied("You do not have permission to log progress for this goal.")
-        serializer.save()
+        progress = serializer.save()
+        # Auto-sync: Add progress amount to goal's current_value
+        goal.current_value += progress.amount
+        goal.save()
+
+    def perform_update(self, serializer):
+        """
+        Update a progress entry and adjust the goal's current_value accordingly.
+
+        When updating progress, the difference between old and new amounts
+        is applied to the goal's current_value.
+
+        Args:
+            serializer: Validated GoalProgressSerializer instance.
+        """
+        old_amount = serializer.instance.amount
+        progress = serializer.save()
+        # Auto-sync: Adjust goal's current_value by the difference
+        amount_diff = progress.amount - old_amount
+        goal = progress.goal
+        goal.current_value += amount_diff
+        goal.save()
+
+    def perform_destroy(self, instance):
+        """
+        Delete a progress entry and subtract its amount from the goal's current_value.
+
+        Args:
+            instance: GoalProgress instance to delete.
+        """
+        goal = instance.goal
+        # Auto-sync: Subtract the deleted amount from goal's current_value
+        goal.current_value -= instance.amount
+        goal.save()
+        instance.delete()

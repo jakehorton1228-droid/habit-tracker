@@ -24,9 +24,9 @@ export default function Dashboard() {
         habitsAPI.listLogs(),
         goalsAPI.list(),
       ])
-      setHabits(habitsRes.data)
-      setHabitLogs(logsRes.data)
-      setGoals(goalsRes.data)
+      setHabits(habitsRes.data.results || habitsRes.data || [])
+      setHabitLogs(logsRes.data.results || logsRes.data || [])
+      setGoals(goalsRes.data.results || goalsRes.data || [])
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
     } finally {

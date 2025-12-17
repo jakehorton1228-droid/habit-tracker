@@ -211,3 +211,94 @@ class GoalProgressAPITests(APITestCase):
         self.client.force_authenticate(user=self.user)
         response = self.client.get(f'/api/goals/progress/?goal={self.goal.id}')
         self.assertEqual(response.data['count'], 1)
+
+    def test_progress_auto_sync_on_create(self):
+        """Test that creating progress automatically updates goal's current_value."""
+        self.client.force_authenticate(user=self.user)
+        initial_value = self.goal.current_value
+        data = {
+            'goal': self.goal.id,
+            'amount': '100.00',
+            'note': 'Test progress'
+        }
+        response = self.client.post('/api/goals/progress/', data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.goal.refresh_from_db()
+        self.assertEqual(self.goal.current_value, initial_value + Decimal('100.00'))
+
+    def test_progress_auto_sync_on_update(self):
+        """Test that updating progress adjusts goal's current_value."""
+        self.client.force_authenticate(user=self.user)
+        # Create initial progress
+        data = {'goal': self.goal.id, 'amount': '100.00'}
+        response = self.client.post('/api/goals/progress/', data)
+        progress_id = response.data['id']
+        self.goal.refresh_from_db()
+        self.assertEqual(self.goal.current_value, Decimal('100.00'))
+
+        # Update progress to a different amount
+        update_data = {'goal': self.goal.id, 'amount': '150.00'}
+        response = self.client.put(f'/api/goals/progress/{progress_id}/', update_data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.goal.refresh_from_db()
+        self.assertEqual(self.goal.current_value, Decimal('150.00'))
+
+    def test_progress_auto_sync_on_delete(self):
+        """Test that deleting progress subtracts from goal's current_value."""
+        self.client.force_authenticate(user=self.user)
+        # Create progress
+        data = {'goal': self.goal.id, 'amount': '100.00'}
+        response = self.client.post('/api/goals/progress/', data)
+        progress_id = response.data['id']
+        self.goal.refresh_from_db()
+        self.assertEqual(self.goal.current_value, Decimal('100.00'))
+
+        # Delete progress
+        response = self.client.delete(f'/api/goals/progress/{progress_id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.goal.refresh_from_db()
+        self.assertEqual(self.goal.current_value, Decimal('0.00'))
+
+
+class GoalStatsAPITests(APITestCase):
+    """Tests for Goal stats endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass123'
+        )
+        self.goal = Goal.objects.create(
+            user=self.user,
+            name='Save money',
+            unit='dollars',
+            target_value=Decimal('1000.00'),
+            current_value=Decimal('250.00')
+        )
+
+    def test_stats_endpoint_returns_data(self):
+        """Test that stats endpoint returns expected fields."""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get('/api/goals/stats/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('total_goals', response.data)
+        self.assertIn('completed_goals', response.data)
+        self.assertIn('in_progress_goals', response.data)
+        self.assertIn('overall_completion_rate', response.data)
+        self.assertIn('approaching_deadlines', response.data)
+        self.assertIn('goal_stats', response.data)
+        self.assertIn('recent_progress', response.data)
+        self.assertIn('progress_this_week', response.data)
+
+    def test_stats_totals(self):
+        """Test stats endpoint returns correct totals."""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get('/api/goals/stats/')
+        self.assertEqual(response.data['total_goals'], 1)
+        self.assertEqual(response.data['in_progress_goals'], 1)
+        self.assertEqual(response.data['completed_goals'], 0)
+
+    def test_stats_unauthenticated(self):
+        """Test stats endpoint requires authentication."""
+        response = self.client.get('/api/goals/stats/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

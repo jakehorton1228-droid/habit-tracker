@@ -239,7 +239,7 @@ export default function Journal() {
     try {
       setLoading(true)
       const response = await journalAPI.list()
-      setEntries(response.data || [])
+      setEntries(response.data.results || response.data || [])
       setError(null)
     } catch (err) {
       console.error('Failed to load journal:', err.response?.data || err.message || err)

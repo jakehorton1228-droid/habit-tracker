@@ -27,7 +27,11 @@ Security:
     - Users can only access their own habits and logs
     - Attempting to log habits owned by other users raises PermissionDenied
 """
+from datetime import date, timedelta
+from django.db.models import Count
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django_filters import rest_framework as filters
@@ -126,6 +130,113 @@ class HabitViewSet(viewsets.ModelViewSet):
             serializer: Validated HabitSerializer instance.
         """
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        Get habit statistics for the authenticated user.
+
+        Returns comprehensive statistics including:
+        - Total habits count
+        - Completions today
+        - Current streak (consecutive days with any completion)
+        - Best streak
+        - Weekly completion rates (last 8 weeks)
+        - Per-habit statistics (90-day completion rate)
+        - Heatmap data (last 90 days)
+
+        Example:
+            GET /api/habits/stats/
+            Authorization: Bearer <token>
+        """
+        user = request.user
+        today = date.today()
+        habits = Habit.objects.filter(user=user)
+        logs = HabitLog.objects.filter(habit__user=user)
+
+        # Total habits
+        total_habits = habits.count()
+
+        # Completions today
+        completions_today = logs.filter(date=today).count()
+
+        # Calculate current streak (consecutive days with any log)
+        log_dates = set(logs.values_list('date', flat=True))
+        current_streak = 0
+        check_date = today
+        while check_date in log_dates:
+            current_streak += 1
+            check_date -= timedelta(days=1)
+
+        # Calculate best streak (longest consecutive run)
+        sorted_dates = sorted(log_dates)
+        best_streak = 0
+        if sorted_dates:
+            streak = 1
+            for i in range(1, len(sorted_dates)):
+                if sorted_dates[i] - sorted_dates[i-1] == timedelta(days=1):
+                    streak += 1
+                else:
+                    best_streak = max(best_streak, streak)
+                    streak = 1
+            best_streak = max(best_streak, streak)
+
+        # Weekly completion rates (last 8 weeks)
+        weekly_stats = []
+        for week_offset in range(7, -1, -1):
+            week_start = today - timedelta(days=today.weekday() + (week_offset * 7))
+            week_end = week_start + timedelta(days=6)
+            if week_end > today:
+                week_end = today
+
+            days_in_week = (week_end - week_start).days + 1
+            total_possible = total_habits * days_in_week
+            week_completions = logs.filter(
+                date__gte=week_start,
+                date__lte=week_end
+            ).count()
+
+            rate = round((week_completions / total_possible) * 100) if total_possible > 0 else 0
+            weekly_stats.append({
+                'week_start': week_start.isoformat(),
+                'completions': week_completions,
+                'possible': total_possible,
+                'rate': rate,
+            })
+
+        # Per-habit stats (90 days)
+        ninety_days_ago = today - timedelta(days=90)
+        habit_stats = []
+        for habit in habits:
+            habit_logs = logs.filter(habit=habit, date__gte=ninety_days_ago)
+            completion_count = habit_logs.count()
+            rate = round((completion_count / 90) * 100)
+            habit_stats.append({
+                'id': habit.id,
+                'name': habit.name,
+                'category': habit.category,
+                'completions': completion_count,
+                'rate': rate,
+            })
+        habit_stats.sort(key=lambda x: x['rate'], reverse=True)
+
+        # Heatmap data (last 90 days - dates with completions)
+        heatmap_data = list(logs.filter(
+            date__gte=ninety_days_ago
+        ).values('date').annotate(
+            count=Count('id')
+        ).order_by('date'))
+        heatmap_dates = [{'date': item['date'].isoformat(), 'count': item['count']} for item in heatmap_data]
+
+        return Response({
+            'total_habits': total_habits,
+            'completions_today': completions_today,
+            'current_streak': current_streak,
+            'best_streak': best_streak,
+            'weekly_stats': weekly_stats,
+            'habit_stats': habit_stats,
+            'heatmap': heatmap_dates,
+        })
 
 
 class HabitLogViewSet(viewsets.ModelViewSet):

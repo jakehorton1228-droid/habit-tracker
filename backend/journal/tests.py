@@ -182,3 +182,46 @@ class JournalEntryAPITests(APITestCase):
         self.client.force_authenticate(user=self.user)
         response = self.client.get('/api/journal/?search=test')
         self.assertEqual(response.data['count'], 1)
+
+
+class JournalStatsAPITests(APITestCase):
+    """Tests for Journal stats endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass123'
+        )
+        self.entry = JournalEntry.objects.create(
+            user=self.user,
+            date=date.today(),
+            time=time(20, 30),
+            entry_type='freeform',
+            mood='good',
+            content='Test entry content'
+        )
+
+    def test_stats_endpoint_returns_data(self):
+        """Test that stats endpoint returns expected fields."""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get('/api/journal/stats/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('total_entries', response.data)
+        self.assertIn('entries_this_week', response.data)
+        self.assertIn('mood_distribution', response.data)
+        self.assertIn('mood_trends', response.data)
+        self.assertIn('entry_types', response.data)
+        self.assertIn('current_streak', response.data)
+        self.assertIn('best_streak', response.data)
+
+    def test_stats_totals(self):
+        """Test stats endpoint returns correct totals."""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get('/api/journal/stats/')
+        self.assertEqual(response.data['total_entries'], 1)
+        self.assertEqual(response.data['entries_this_week'], 1)
+
+    def test_stats_unauthenticated(self):
+        """Test stats endpoint requires authentication."""
+        response = self.client.get('/api/journal/stats/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

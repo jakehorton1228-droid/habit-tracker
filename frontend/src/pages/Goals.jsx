@@ -260,8 +260,8 @@ export default function Goals() {
         goalsAPI.list(),
         goalsAPI.listProgress(),
       ])
-      setGoals(goalsRes.data || [])
-      setProgress(progressRes.data || [])
+      setGoals(goalsRes.data.results || goalsRes.data || [])
+      setProgress(progressRes.data.results || progressRes.data || [])
       setError(null)
     } catch (err) {
       console.error('Failed to load goals:', err.response?.data || err.message || err)

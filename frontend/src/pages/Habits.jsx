@@ -184,8 +184,8 @@ export default function Habits() {
         habitsAPI.list(),
         habitsAPI.listLogs(),
       ])
-      setHabits(habitsRes.data || [])
-      setLogs(logsRes.data || [])
+      setHabits(habitsRes.data.results || habitsRes.data || [])
+      setLogs(logsRes.data.results || logsRes.data || [])
       setError(null)
     } catch (err) {
       console.error('Failed to load habits:', err.response?.data || err.message || err)

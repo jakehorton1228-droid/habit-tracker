@@ -25,7 +25,11 @@ Features:
     - Mood tracking on each entry
     - Ordered by date and time (newest first)
 """
+from datetime import date, timedelta
+from django.db.models import Count
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters import rest_framework as filters
 
@@ -142,3 +146,95 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
             serializer: Validated JournalEntrySerializer instance.
         """
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        Get journal statistics and mood trends for the authenticated user.
+
+        Returns comprehensive statistics including:
+        - Total entries count
+        - Entries this week
+        - Mood distribution (all time)
+        - Mood trends (last 30 days, grouped by week)
+        - Entry type breakdown
+        - Writing streak (consecutive days with entries)
+
+        Example:
+            GET /api/journal/stats/
+            Authorization: Bearer <token>
+        """
+        user = request.user
+        today = date.today()
+        entries = JournalEntry.objects.filter(user=user)
+
+        # Total entries
+        total_entries = entries.count()
+
+        # Entries this week
+        week_start = today - timedelta(days=today.weekday())
+        entries_this_week = entries.filter(date__gte=week_start).count()
+
+        # Mood distribution (all time)
+        mood_distribution = list(entries.values('mood').annotate(
+            count=Count('id')
+        ).order_by('mood'))
+
+        # Mood trends (last 30 days, grouped by week)
+        thirty_days_ago = today - timedelta(days=30)
+        mood_trends = []
+        for week_offset in range(4, -1, -1):
+            week_start = today - timedelta(days=(week_offset * 7) + today.weekday())
+            week_end = week_start + timedelta(days=6)
+            if week_end > today:
+                week_end = today
+            if week_start < thirty_days_ago:
+                week_start = thirty_days_ago
+
+            week_entries = entries.filter(date__gte=week_start, date__lte=week_end)
+            week_mood_counts = dict(week_entries.values('mood').annotate(
+                count=Count('id')
+            ).values_list('mood', 'count'))
+
+            mood_trends.append({
+                'week_start': week_start.isoformat(),
+                'week_end': week_end.isoformat(),
+                'moods': week_mood_counts,
+                'total': sum(week_mood_counts.values()),
+            })
+
+        # Entry type breakdown
+        entry_types = list(entries.values('entry_type').annotate(
+            count=Count('id')
+        ).order_by('entry_type'))
+
+        # Writing streak (consecutive days with entries)
+        entry_dates = set(entries.values_list('date', flat=True))
+        current_streak = 0
+        check_date = today
+        while check_date in entry_dates:
+            current_streak += 1
+            check_date -= timedelta(days=1)
+
+        # Best streak
+        sorted_dates = sorted(entry_dates)
+        best_streak = 0
+        if sorted_dates:
+            streak = 1
+            for i in range(1, len(sorted_dates)):
+                if sorted_dates[i] - sorted_dates[i-1] == timedelta(days=1):
+                    streak += 1
+                else:
+                    best_streak = max(best_streak, streak)
+                    streak = 1
+            best_streak = max(best_streak, streak)
+
+        return Response({
+            'total_entries': total_entries,
+            'entries_this_week': entries_this_week,
+            'mood_distribution': mood_distribution,
+            'mood_trends': mood_trends,
+            'entry_types': entry_types,
+            'current_streak': current_streak,
+            'best_streak': best_streak,
+        })
