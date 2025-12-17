@@ -7,6 +7,20 @@ All endpoints except registration and login require authentication via JWT token
 Authorization: Bearer <access_token>
 ```
 
+## Pagination
+
+All list endpoints return paginated responses with 20 items per page:
+```json
+{
+  "count": 42,
+  "next": "http://localhost:8000/api/habits/?page=2",
+  "previous": null,
+  "results": [...]
+}
+```
+
+Use the `page` query parameter to navigate: `GET /habits/?page=2`
+
 ## Authentication
 
 ### Register
@@ -118,22 +132,29 @@ GET /habits/
 
 **Response:** `200 OK`
 ```json
-[
-  {
-    "id": 1,
-    "name": "Morning Run",
-    "frequency": "daily",
-    "created_at": "2025-01-15T08:00:00Z",
-    "updated_at": "2025-01-15T08:00:00Z"
-  },
-  {
-    "id": 2,
-    "name": "Read 30 minutes",
-    "frequency": "daily",
-    "created_at": "2025-01-15T08:00:00Z",
-    "updated_at": "2025-01-15T08:00:00Z"
-  }
-]
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "name": "Morning Run",
+      "category": "health",
+      "frequency": "daily",
+      "created_at": "2025-01-15T08:00:00Z",
+      "updated_at": "2025-01-15T08:00:00Z"
+    },
+    {
+      "id": 2,
+      "name": "Read 30 minutes",
+      "category": "learning",
+      "frequency": "daily",
+      "created_at": "2025-01-15T08:00:00Z",
+      "updated_at": "2025-01-15T08:00:00Z"
+    }
+  ]
+}
 ```
 
 ---
@@ -150,6 +171,7 @@ POST /habits/
 ```json
 {
   "name": "Meditate",
+  "category": "mindfulness",
   "frequency": "daily"
 }
 ```
@@ -159,6 +181,7 @@ POST /habits/
 {
   "id": 3,
   "name": "Meditate",
+  "category": "mindfulness",
   "frequency": "daily",
   "created_at": "2025-01-15T10:30:00Z",
   "updated_at": "2025-01-15T10:30:00Z"
@@ -180,6 +203,7 @@ GET /habits/{id}/
 {
   "id": 1,
   "name": "Morning Run",
+  "category": "health",
   "frequency": "daily",
   "created_at": "2025-01-15T08:00:00Z",
   "updated_at": "2025-01-15T08:00:00Z"
@@ -200,6 +224,7 @@ PUT /habits/{id}/
 ```json
 {
   "name": "Morning Jog",
+  "category": "health",
   "frequency": "daily"
 }
 ```
@@ -209,6 +234,7 @@ PUT /habits/{id}/
 {
   "id": 1,
   "name": "Morning Jog",
+  "category": "health",
   "frequency": "daily",
   "created_at": "2025-01-15T08:00:00Z",
   "updated_at": "2025-01-15T11:00:00Z"
@@ -241,22 +267,27 @@ GET /habits/logs/
 
 **Response:** `200 OK`
 ```json
-[
-  {
-    "id": 1,
-    "habit": 1,
-    "date": "2025-01-15",
-    "note": "Ran 5km today!",
-    "created_at": "2025-01-15T07:30:00Z"
-  },
-  {
-    "id": 2,
-    "habit": 1,
-    "date": "2025-01-14",
-    "note": null,
-    "created_at": "2025-01-14T07:45:00Z"
-  }
-]
+{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "habit": 1,
+      "date": "2025-01-15",
+      "note": "Ran 5km today!",
+      "created_at": "2025-01-15T07:30:00Z"
+    },
+    {
+      "id": 2,
+      "habit": 1,
+      "date": "2025-01-14",
+      "note": null,
+      "created_at": "2025-01-14T07:45:00Z"
+    }
+  ]
+}
 ```
 
 ---
@@ -303,20 +334,25 @@ GET /goals/
 
 **Response:** `200 OK`
 ```json
-[
-  {
-    "id": 1,
-    "name": "Save $1000",
-    "description": "Emergency fund savings",
-    "unit": "dollars",
-    "target_value": "1000.00",
-    "current_value": "350.00",
-    "start_date": "2025-01-01",
-    "end_date": "2025-06-30",
-    "created_at": "2025-01-01T00:00:00Z",
-    "updated_at": "2025-01-15T00:00:00Z"
-  }
-]
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "name": "Save $1000",
+      "description": "Emergency fund savings",
+      "unit": "dollars",
+      "target_value": "1000.00",
+      "current_value": "350.00",
+      "start_date": "2025-01-01",
+      "end_date": "2025-06-30",
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-15T00:00:00Z"
+    }
+  ]
+}
 ```
 
 ---
@@ -449,16 +485,21 @@ GET /goals/progress/
 
 **Response:** `200 OK`
 ```json
-[
-  {
-    "id": 1,
-    "goal": 1,
-    "date": "2025-01-15",
-    "amount": "50.00",
-    "note": "Weekly savings deposit",
-    "created_at": "2025-01-15T10:00:00Z"
-  }
-]
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "goal": 1,
+      "date": "2025-01-15",
+      "amount": "50.00",
+      "note": "Weekly savings deposit",
+      "created_at": "2025-01-15T10:00:00Z"
+    }
+  ]
+}
 ```
 
 ---

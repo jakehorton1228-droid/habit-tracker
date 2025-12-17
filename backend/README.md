@@ -53,7 +53,6 @@ backend/
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
-   pip install djangorestframework-simplejwt
    ```
 
 3. Create a `.env` file:

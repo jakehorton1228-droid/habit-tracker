@@ -76,7 +76,6 @@ habit-tracker/
    ```bash
    cd backend
    pip install -r requirements.txt
-   pip install djangorestframework-simplejwt
    ```
 
 3. Create a `.env` file (see [Environment Variables](#environment-variables))
