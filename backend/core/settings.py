@@ -170,4 +170,10 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5173',
 ]
 
+# Add production origins from environment
+import os
+PRODUCTION_ORIGIN = os.getenv('CORS_ORIGIN')
+if PRODUCTION_ORIGIN:
+    CORS_ALLOWED_ORIGINS.append(PRODUCTION_ORIGIN)
+
 CORS_ALLOW_CREDENTIALS = True
